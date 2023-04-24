@@ -1,15 +1,16 @@
 #include "Renderer.h"
 
+
 #include <game-activity/native_app_glue/android_native_app_glue.h>
 #include <GLES3/gl3.h>
-#include <memory>
-#include <vector>
 #include <android/imagedecoder.h>
 
+
+#include <cassert>
+#include <memory>
+#include <vector>
+
 #include "AndroidOut.h"
-#include "Shader.h"
-#include "Utility.h"
-#include "TextureAsset.h"
 #include "LearnES3Util.h"
 
 //! executes glGetString and outputs the result to logcat
@@ -37,58 +38,11 @@ aout << std::endl;\
 //! Color for cornflower blue. Can be sent directly to glClearColor
 #define CORNFLOWER_BLUE 100 / 255.f, 149 / 255.f, 237 / 255.f, 1
 
-// Vertex shader, you'd typically load this from assets
-static const char *vertex = R"vertex(#version 300 es
-in vec3 inPosition;
-in vec2 inUV;
-
-out vec2 fragUV;
-
-uniform mat4 uProjection;
-
-void main() {
-    fragUV = inUV;
-    gl_Position = uProjection * vec4(inPosition, 1.0);
-}
-)vertex";
-
-// Fragment shader, you'd typically load this from assets
-static const char *fragment = R"fragment(#version 300 es
-precision mediump float;
-
-in vec2 fragUV;
-
-uniform sampler2D uTexture;
-
-out vec4 outColor;
-
-void main() {
-    outColor = texture(uTexture, fragUV);
-}
-)fragment";
-
-/*!
- * Half the height of the projection matrix. This gives you a renderable area of height 4 ranging
- * from -2 to 2
- */
-static constexpr float kProjectionHalfHeight = 2.f;
-
-/*!
- * The near plane distance for the projection matrix. Since this is an orthographic projection
- * matrix, it's convenient to have negative values for sorting (and avoiding z-fighting at 0).
- */
-static constexpr float kProjectionNearPlane = -1.f;
-
-/*!
- * The far plane distance for the projection matrix. Since this is an orthographic porjection
- * matrix, it's convenient to have the far plane equidistant from 0 as the near plane.
- */
-static constexpr float kProjectionFarPlane = 1.f;
 
 ///
 // Initialize the shader and program object
 //
-int Init (GLuint* program_object) {
+int InitTriangle(GLuint* program_object) {
     char vShaderStr[] =
             "#version 300 es                          \n"
             "layout(location = 0) in vec4 vPosition;  \n"
@@ -118,8 +72,7 @@ int Init (GLuint* program_object) {
     // Create the program object
     programObject = glCreateProgram ( );
 
-    if ( programObject == 0 )
-    {
+    if ( programObject == 0 ) {
         return 0;
     }
 
@@ -210,23 +163,6 @@ void Renderer::render() {
     // even if you change from the sample orthographic projection matrix as your aspect ratio has
     // likely changed.
     if (shaderNeedsNewProjectionMatrix_) {
-        // a placeholder projection matrix allocated on the stack. Column-major memory layout
-        float projectionMatrix[16] = {0};
-
-        // build an orthographic projection matrix for 2d rendering
-        Utility::buildOrthographicMatrix(
-                projectionMatrix,
-                kProjectionHalfHeight,
-                float(width_) / height_,
-                kProjectionNearPlane,
-                kProjectionFarPlane);
-
-        // send the matrix to the shader
-        // Note: the shader must be active for this to work. Since we only have one shader for this
-        // demo, we can assume that it's active.
-        shader_->setProjectionMatrix(projectionMatrix);
-
-        // make sure the matrix isn't generated every frame
         shaderNeedsNewProjectionMatrix_ = false;
     }
 
@@ -236,16 +172,11 @@ void Renderer::render() {
     // Render all the models. There's no depth testing in this sample so they're accepted in the
     // order provided. But the sample EGL setup requests a 24 bit depth buffer so you could
     // configure it at the end of initRenderer
-    if (!models_.empty()) {
-        // for (const auto &model: models_) {
-        //    shader_->drawModel(model);
-        // }
-        DrawTriangle(program_object_, width_, height_);
-    }
+    DrawTriangle(program_object_, width_, height_);
 
     // Present the rendered image. This is an implicit glFlush.
     auto swapResult = eglSwapBuffers(display_, surface_);
-    assert(swapResult == EGL_TRUE);
+    // assert(swapResult == EGL_TRUE);
 }
 
 void Renderer::initRenderer() {
@@ -321,14 +252,6 @@ void Renderer::initRenderer() {
     PRINT_GL_STRING(GL_VERSION);
     PRINT_GL_STRING_AS_LIST(GL_EXTENSIONS);
 
-    shader_ = std::unique_ptr<Shader>(
-            Shader::loadShader(vertex, fragment, "inPosition", "inUV", "uProjection"));
-    assert(shader_);
-
-    // Note: there's only one shader in this demo, so I'll activate it here. For a more complex game
-    // you'll want to track the active shader and activate/deactivate it as necessary
-    shader_->activate();
-
     // setup any other gl related global states
     glClearColor(CORNFLOWER_BLUE);
 
@@ -336,10 +259,7 @@ void Renderer::initRenderer() {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    // get some demo models into memory
-    createModels();
-
-    Init(&program_object_);
+    InitTriangle(&program_object_);
 }
 
 void Renderer::updateRenderArea() {
@@ -357,39 +277,6 @@ void Renderer::updateRenderArea() {
         // make sure that we lazily recreate the projection matrix before we render
         shaderNeedsNewProjectionMatrix_ = true;
     }
-}
-
-/**
- * @brief Create any demo models we want for this demo.
- */
-void Renderer::createModels() {
-    /*
-     * This is a square:
-     * 0 --- 1
-     * | \   |
-     * |  \  |
-     * |   \ |
-     * 3 --- 2
-     */
-    std::vector<Vertex> vertices = {
-            Vertex(Vector3{1, 1, 0}, Vector2{0, 0}), // 0
-            Vertex(Vector3{-1, 1, 0}, Vector2{1, 0}), // 1
-            Vertex(Vector3{-1, -1, 0}, Vector2{1, 1}), // 2
-            Vertex(Vector3{1, -1, 0}, Vector2{0, 1}) // 3
-    };
-    std::vector<Index> indices = {
-            0, 1, 2, 0, 2, 3
-    };
-
-    // loads an image and assigns it to the square.
-    //
-    // Note: there is no texture management in this sample, so if you reuse an image be careful not
-    // to load it repeatedly. Since you get a shared_ptr you can safely reuse it in many models.
-    auto assetManager = app_->activity->assetManager;
-    auto spAndroidRobotTexture = TextureAsset::loadAsset(assetManager, "android_robot.png");
-
-    // Create a model and put it in the back of the render list.
-    models_.emplace_back(vertices, indices, spAndroidRobotTexture);
 }
 
 void Renderer::handleInput() {

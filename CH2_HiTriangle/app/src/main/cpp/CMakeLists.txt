@@ -10,10 +10,7 @@ project("hitriangle")
 add_library(hitriangle SHARED
         main.cpp
         AndroidOut.cpp
-        Renderer.cpp
-        Shader.cpp
-        TextureAsset.cpp
-        Utility.cpp)
+        Renderer.cpp)
 
 # Searches for a package provided by the game activity dependency
 find_package(game-activity REQUIRED CONFIG)

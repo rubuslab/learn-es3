@@ -2,10 +2,8 @@
 #define ANDROIDGLINVESTIGATIONS_RENDERER_H
 
 #include <EGL/egl.h>
+#include <GLES3/gl3.h>
 #include <memory>
-
-#include "Model.h"
-#include "Shader.h"
 
 struct android_app;
 
@@ -53,12 +51,6 @@ private:
      */
     void updateRenderArea();
 
-    /*!
-     * Creates the models for this sample. You'd likely load a scene configuration from a file or
-     * use some other setup logic in your full game.
-     */
-    void createModels();
-
     android_app *app_;
     EGLDisplay display_;
     EGLSurface surface_;
@@ -67,11 +59,6 @@ private:
     EGLint height_;
 
     bool shaderNeedsNewProjectionMatrix_;
-
-    std::unique_ptr<Shader> shader_;
-    std::vector<Model> models_;
-
-    std::unique_ptr<Shader> hishader_;
 
     GLuint program_object_;
 };

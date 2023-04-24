@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace 'com.rubus.ch2_hitriangle'
+    namespace 'com.rubus.hitriangle'
     compileSdk 33
 
     defaultConfig {
-        applicationId "com.rubus.ch2_hitriangle"
+        applicationId "com.rubus.hitriangle"
         minSdk 30
         targetSdk 33
         versionCode 1

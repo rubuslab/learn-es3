@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "HiTriangle"
+rootProject.name = "CH2_HiTriangle"
 include ':app'

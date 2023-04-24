@@ -3,11 +3,11 @@
 
 cmake_minimum_required(VERSION 3.22.1)
 
-project("ch2_hitriangle")
+project("hitriangle")
 
 # Creates your game shared library. The name must be the same as the
 # one used for loading in your Kotlin/Java or AndroidManifest.txt files.
-add_library(ch2_hitriangle SHARED
+add_library(hitriangle SHARED
         main.cpp
         AndroidOut.cpp
         Renderer.cpp
@@ -19,7 +19,7 @@ add_library(ch2_hitriangle SHARED
 find_package(game-activity REQUIRED CONFIG)
 
 # Configure libraries CMake uses to link your target library.
-target_link_libraries(ch2_hitriangle
+target_link_libraries(hitriangle
         # The game activity
         game-activity::game-activity
 

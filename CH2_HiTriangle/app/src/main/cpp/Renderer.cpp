@@ -359,7 +359,6 @@ void Renderer::updateRenderArea() {
     }
 }
 
-
 /**
  * @brief Create any demo models we want for this demo.
  */

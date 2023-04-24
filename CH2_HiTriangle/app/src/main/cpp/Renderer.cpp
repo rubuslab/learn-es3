@@ -10,6 +10,7 @@
 #include "Shader.h"
 #include "Utility.h"
 #include "TextureAsset.h"
+#include "LearnES3Util.h"
 
 //! executes glGetString and outputs the result to logcat
 #define PRINT_GL_STRING(s) {aout << #s": "<< glGetString(s) << std::endl;}
@@ -84,6 +85,80 @@ static constexpr float kProjectionNearPlane = -1.f;
  */
 static constexpr float kProjectionFarPlane = 1.f;
 
+///
+// Initialize the shader and program object
+//
+int Init (GLuint* program_object) {
+    char vShaderStr[] =
+            "#version 300 es                          \n"
+            "layout(location = 0) in vec4 vPosition;  \n"
+            "void main()                              \n"
+            "{                                        \n"
+            "   gl_Position = vPosition;              \n"
+            "}                                        \n";
+
+    char fShaderStr[] =
+            "#version 300 es                              \n"
+            "precision mediump float;                     \n"
+            "out vec4 fragColor;                          \n"
+            "void main()                                  \n"
+            "{                                            \n"
+            "   fragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );  \n"
+            "}                                            \n";
+
+    GLuint vertexShader;
+    GLuint fragmentShader;
+    GLuint programObject;
+    GLint linked;
+
+    // Load the vertex/fragment shaders
+    vertexShader = LoadShader ( GL_VERTEX_SHADER, vShaderStr );
+    fragmentShader = LoadShader ( GL_FRAGMENT_SHADER, fShaderStr );
+
+    // Create the program object
+    programObject = glCreateProgram ( );
+
+    if ( programObject == 0 )
+    {
+        return 0;
+    }
+
+    glAttachShader ( programObject, vertexShader );
+    glAttachShader ( programObject, fragmentShader );
+
+    // Link the program
+    glLinkProgram ( programObject );
+
+    // Check the link status
+    glGetProgramiv ( programObject, GL_LINK_STATUS, &linked );
+
+    if ( !linked )
+    {
+        GLint infoLen = 0;
+
+        glGetProgramiv ( programObject, GL_INFO_LOG_LENGTH, &infoLen );
+
+        if ( infoLen > 1 )
+        {
+            char* infoLog = (char*)malloc ( sizeof ( char ) * infoLen );
+
+            glGetProgramInfoLog ( programObject, infoLen, NULL, infoLog );
+            esLogMessage ( "Error linking program:\n%s\n", infoLog );
+
+            free ( infoLog );
+        }
+
+        glDeleteProgram ( programObject );
+        return FALSE;
+    }
+
+    // Store the program object
+    *program_object = programObject;
+
+    glClearColor ( 1.0f, 1.0f, 1.0f, 0.0f );
+    return TRUE;
+}
+
 Renderer::~Renderer() {
     if (display_ != EGL_NO_DISPLAY) {
         eglMakeCurrent(display_, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
@@ -98,6 +173,31 @@ Renderer::~Renderer() {
         eglTerminate(display_);
         display_ = EGL_NO_DISPLAY;
     }
+
+    glDeleteProgram(program_object_);
+    program_object_ = 0;
+}
+
+void DrawTriangle(GLuint program_object, GLsizei width, GLsizei height) {
+    GLfloat vVertices[] = {  0.0f,  0.5f, 0.0f,
+                             -0.5f, -0.5f, 0.0f,
+                             0.5f, -0.5f, 0.0f
+    };
+
+    // Set the viewport
+    glViewport ( 0, 0, width, height);
+
+    // Clear the color buffer
+    glClear ( GL_COLOR_BUFFER_BIT );
+
+    // Use the program object
+    glUseProgram(program_object);
+
+    // Load the vertex data
+    glVertexAttribPointer ( 0, 3, GL_FLOAT, GL_FALSE, 0, vVertices );
+    glEnableVertexAttribArray ( 0 );
+
+    glDrawArrays ( GL_TRIANGLES, 0, 3 );
 }
 
 void Renderer::render() {
@@ -137,9 +237,10 @@ void Renderer::render() {
     // order provided. But the sample EGL setup requests a 24 bit depth buffer so you could
     // configure it at the end of initRenderer
     if (!models_.empty()) {
-        for (const auto &model: models_) {
-            shader_->drawModel(model);
-        }
+        // for (const auto &model: models_) {
+        //    shader_->drawModel(model);
+        // }
+        DrawTriangle(program_object_, width_, height_);
     }
 
     // Present the rendered image. This is an implicit glFlush.
@@ -237,6 +338,8 @@ void Renderer::initRenderer() {
 
     // get some demo models into memory
     createModels();
+
+    Init(&program_object_);
 }
 
 void Renderer::updateRenderArea() {

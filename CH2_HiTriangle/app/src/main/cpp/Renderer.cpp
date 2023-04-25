@@ -66,18 +66,17 @@ int InitTriangle(GLuint* program_object) {
     GLint linked;
 
     // Load the vertex/fragment shaders
-    vertexShader = LoadShader ( GL_VERTEX_SHADER, vShaderStr );
-    fragmentShader = LoadShader ( GL_FRAGMENT_SHADER, fShaderStr );
+    vertexShader = LoadShader(GL_VERTEX_SHADER, vShaderStr);
+    fragmentShader = LoadShader(GL_FRAGMENT_SHADER, fShaderStr);
 
     // Create the program object
     programObject = glCreateProgram ( );
-
     if ( programObject == 0 ) {
         return 0;
     }
 
-    glAttachShader ( programObject, vertexShader );
-    glAttachShader ( programObject, fragmentShader );
+    glAttachShader(programObject, vertexShader);
+    glAttachShader(programObject, fragmentShader);
 
     // Link the program
     glLinkProgram ( programObject );
@@ -85,8 +84,7 @@ int InitTriangle(GLuint* program_object) {
     // Check the link status
     glGetProgramiv ( programObject, GL_LINK_STATUS, &linked );
 
-    if ( !linked )
-    {
+    if (!linked) {
         GLint infoLen = 0;
 
         glGetProgramiv ( programObject, GL_INFO_LOG_LENGTH, &infoLen );
@@ -147,8 +145,8 @@ void DrawTriangle(GLuint program_object, GLsizei width, GLsizei height) {
     glUseProgram(program_object);
 
     // Load the vertex data
-    glVertexAttribPointer ( 0, 3, GL_FLOAT, GL_FALSE, 0, vVertices );
-    glEnableVertexAttribArray ( 0 );
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, vVertices);
+    glEnableVertexAttribArray(0);
 
     glDrawArrays ( GL_TRIANGLES, 0, 3 );
 }
@@ -176,7 +174,7 @@ void Renderer::render() {
 
     // Present the rendered image. This is an implicit glFlush.
     auto swapResult = eglSwapBuffers(display_, surface_);
-    // assert(swapResult == EGL_TRUE);
+    assert(swapResult == EGL_TRUE);
 }
 
 void Renderer::initRenderer() {

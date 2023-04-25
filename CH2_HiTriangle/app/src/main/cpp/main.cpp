@@ -31,7 +31,7 @@ void handle_cmd(android_app *pApp, int32_t cmd) {
             // We have to check if userData is assigned just in case this comes in really quickly
             if (pApp->userData) {
                 //
-                auto *pRenderer = reinterpret_cast<Renderer *>(pApp->userData);
+                auto* pRenderer = reinterpret_cast<Renderer *>(pApp->userData);
                 pApp->userData = nullptr;
                 delete pRenderer;
             }
@@ -87,7 +87,7 @@ void android_main(struct android_app *pApp) {
 
             // We know that our user data is a Renderer, so reinterpret cast it. If you change your
             // user data remember to change it here
-            auto *pRenderer = reinterpret_cast<Renderer *>(pApp->userData);
+            auto* pRenderer = reinterpret_cast<Renderer *>(pApp->userData);
 
             // Process game input
             pRenderer->handleInput();

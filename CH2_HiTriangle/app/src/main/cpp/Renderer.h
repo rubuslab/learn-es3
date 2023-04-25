@@ -51,7 +51,7 @@ private:
      */
     void updateRenderArea();
 
-    android_app *app_;
+    android_app* app_;
     EGLDisplay display_;
     EGLSurface surface_;
     EGLContext context_;

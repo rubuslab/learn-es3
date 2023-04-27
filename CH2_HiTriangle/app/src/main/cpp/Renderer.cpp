@@ -45,19 +45,25 @@ aout << std::endl;\
 int InitTriangle(GLuint* program_object) {
     char vShaderStr[] =
             "#version 300 es                          \n"
-            "layout(location = 0) in vec4 vPosition;  \n"
+            "layout(location = 0) in vec3 vPosition;  \n"
+            "layout(location = 1) in vec3 vColor;     \n"
+            "                                         \n"
+            "smooth out vec3 vertOutColor;            \n"
             "void main()                              \n"
             "{                                        \n"
-            "   gl_Position = vPosition;              \n"
+            "   gl_Position = vec4(vPosition, 1.0);   \n"
+            "   vertOutColor = vColor;                \n"
             "}                                        \n";
 
     char fShaderStr[] =
             "#version 300 es                              \n"
             "precision mediump float;                     \n"
+            "smooth in vec3 vertOutColor;                 \n"
             "out vec4 fragColor;                          \n"
             "void main()                                  \n"
             "{                                            \n"
-            "   fragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );  \n"
+            // "   fragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );  \n"
+            "    fragColor = vec4(vertOutColor, 1.0);     \n"
             "}                                            \n";
 
     GLuint vertexShader;
@@ -82,8 +88,7 @@ int InitTriangle(GLuint* program_object) {
     glLinkProgram ( programObject );
 
     // Check the link status
-    glGetProgramiv ( programObject, GL_LINK_STATUS, &linked );
-
+    glGetProgramiv(programObject, GL_LINK_STATUS, &linked);
     if (!linked) {
         GLint infoLen = 0;
 
@@ -105,6 +110,10 @@ int InitTriangle(GLuint* program_object) {
 
     // Store the program object
     *program_object = programObject;
+
+    // indicate auto delete shader when program been deleted.
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
 
     glClearColor ( 1.0f, 1.0f, 1.0f, 0.0f );
     return TRUE;
@@ -129,24 +138,33 @@ Renderer::~Renderer() {
     program_object_ = 0;
 }
 
+// No EBO, direct draw triangles.
 void DrawTriangle(GLuint program_object, GLsizei width, GLsizei height) {
-    GLfloat vVertices[] = {  0.0f,  0.5f, 0.0f,
-                             -0.5f, -0.5f, 0.0f,
-                             0.5f, -0.5f, 0.0f
+    //                        position,                      |   color
+    GLfloat vVertices[] = {   0.0f,  0.5f, 0.0f,  1.0f, 0.0f, 0.0f,
+                             -0.5f, -0.5f, 0.0f,  0.0f, 1.0f, 0.0f,
+                             0.5f, -0.5f,0.0f, 0.0f, 0.0f, 1.0f
     };
 
     // Set the viewport
     glViewport ( 0, 0, width, height);
 
     // Clear the color buffer
-    glClear ( GL_COLOR_BUFFER_BIT );
+    glClear(GL_COLOR_BUFFER_BIT);
 
     // Use the program object
     glUseProgram(program_object);
 
-    // Load the vertex data
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, vVertices);
+    // disable vbo.
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    // Load the vertex data, position
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), vVertices);
     glEnableVertexAttribArray(0);
+
+    // Load the vertex data, color
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(vVertices + 3));
+    glEnableVertexAttribArray(1);
 
     glDrawArrays ( GL_TRIANGLES, 0, 3 );
 }
@@ -194,7 +212,7 @@ void Renderer::initRenderer() {
     eglInitialize(display, nullptr, nullptr);
 
     // figure out how many configs there are
-    EGLint numConfigs;
+    EGLint numConfigs = 0;
     eglChooseConfig(display, attribs, nullptr, 0, &numConfigs);
 
     // get the list of configurations

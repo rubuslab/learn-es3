@@ -71,74 +71,12 @@
 #define TRUE 1
 #endif
 
-/// esCreateWindow flag - RGB color buffer
-#define ES_WINDOW_RGB           0
-/// esCreateWindow flag - ALPHA color buffer
-#define ES_WINDOW_ALPHA         1
-/// esCreateWindow flag - depth buffer
-#define ES_WINDOW_DEPTH         2
-/// esCreateWindow flag - stencil buffer
-#define ES_WINDOW_STENCIL       4
-/// esCreateWindow flat - multi-sample buffer
-#define ES_WINDOW_MULTISAMPLE   8
-
-typedef struct
-{
-   // Handle to a program object
-   GLuint programObject;
-
-} UserData;
-
-typedef struct
-{
-    GLfloat   m[4][4];
-} ESMatrix;
-
-typedef struct ESContext ESContext;
-
-struct ESContext
-{
-    /// Put platform specific data here
-    void       *platformData;
-
-    /// Put your user data here...
-    void       *userData;
-
-    /// Window width
-    GLint       width;
-
-    /// Window height
-    GLint       height;
-
-#ifndef __APPLE__
-    /// Display handle
-    EGLNativeDisplayType eglNativeDisplay;
-
-    /// Window handle
-    EGLNativeWindowType  eglNativeWindow;
-
-    /// EGL display
-    EGLDisplay  eglDisplay;
-
-    /// EGL context
-    EGLContext  eglContext;
-
-    /// EGL surface
-    EGLSurface  eglSurface;
-#endif
-
-    /// Callbacks
-    void ( ESCALLBACK *drawFunc ) ( ESContext * );
-    void ( ESCALLBACK *shutdownFunc ) ( ESContext * );
-    void ( ESCALLBACK *keyFunc ) ( ESContext *, unsigned char, int, int );
-    void ( ESCALLBACK *updateFunc ) ( ESContext *, float deltaTime );
-};
 
 //
 /// \brief Log a message to the debug output for the platform
 /// \param formatStr Format string for error log.
 //
-void ESUTIL_API esLogMessage ( const char *formatStr, ... ) {
+void ESUTIL_API esLogMessage(const char* formatStr, ...) {
    va_list params;
    char buf[BUFSIZ] = {0};
 
@@ -158,16 +96,14 @@ void ESUTIL_API esLogMessage ( const char *formatStr, ... ) {
 // Create a shader object, load the shader source, and
 // compile the shader.
 //
-GLuint LoadShader ( GLenum type, const char *shaderSrc )
-{
+GLuint LoadShader(GLenum type, const char *shaderSrc) {
    GLuint shader;
    GLint compiled;
 
    // Create the shader object
-   shader = glCreateShader ( type );
+   shader = glCreateShader(type);
 
-   if ( shader == 0 )
-   {
+   if (shader == 0) {
       return 0;
    }
 
@@ -180,14 +116,11 @@ GLuint LoadShader ( GLenum type, const char *shaderSrc )
    // Check the compile status
    glGetShaderiv ( shader, GL_COMPILE_STATUS, &compiled );
 
-   if ( !compiled )
-   {
+   if (!compiled) {
       GLint infoLen = 0;
 
       glGetShaderiv ( shader, GL_INFO_LOG_LENGTH, &infoLen );
-
-      if ( infoLen > 1 )
-      {
+      if (infoLen > 1) {
          char* infoLog = new char[sizeof(char) * infoLen];
 
          glGetShaderInfoLog ( shader, infoLen, NULL, infoLog );
@@ -196,11 +129,10 @@ GLuint LoadShader ( GLenum type, const char *shaderSrc )
          delete []infoLog;
       }
 
-      glDeleteShader ( shader );
+      glDeleteShader(shader);
       return 0;
    }
 
    return shader;
-
 }
 

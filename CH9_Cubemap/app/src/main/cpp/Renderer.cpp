@@ -14,7 +14,7 @@
 #include "LearnES3Util.h"
 
 //! executes glGetString and outputs the result to logcat
-#define PRINT_GL_STRING(s) { aout << #s": " << glGetString(s) << std::endl; }
+#define PRINT_GL_STRING(s) {aout << #s": "<< glGetString(s) << std::endl;}
 
 /*!
  * @brief if glGetString returns a space separated list of elements, prints each one on a new line
@@ -38,8 +38,11 @@ aout << std::endl;\
 //! Color for cornflower blue. Can be sent directly to glClearColor
 #define CORNFLOWER_BLUE 100 / 255.f, 149 / 255.f, 237 / 255.f, 1
 
+
+///
 // Initialize the shader and program object
-bool TriangleRender::Init() {
+//
+int InitTriangle(GLuint* program_object) {
     char vShaderStr[] =
             "#version 300 es                          \n"
             "layout(location = 0) in vec3 vPosition;  \n"
@@ -95,7 +98,7 @@ bool TriangleRender::Init() {
         {
             char* infoLog = (char*)malloc ( sizeof ( char ) * infoLen );
 
-            glGetProgramInfoLog ( programObject, infoLen, nullptr, infoLog );
+            glGetProgramInfoLog ( programObject, infoLen, NULL, infoLog );
             esLogMessage ( "Error linking program:\n%s\n", infoLog );
 
             free ( infoLog );
@@ -106,7 +109,7 @@ bool TriangleRender::Init() {
     }
 
     // Store the program object
-    program_object_ = programObject;
+    *program_object = programObject;
 
     // indicate auto delete shader when program been deleted.
     glDeleteShader(vertexShader);
@@ -114,37 +117,6 @@ bool TriangleRender::Init() {
 
     glClearColor ( 1.0f, 1.0f, 1.0f, 0.0f );
     return TRUE;
-}
-
-// No EBO, direct draw triangles.
-void TriangleRender::Draw(GLsizei width, GLsizei height) const {
-    //                        position,                      |   color
-    GLfloat vVertices[] = {   0.0f,  0.5f, 0.0f,  1.0f, 0.0f, 0.0f,
-                              -0.5f, -0.5f, 0.0f,  0.0f, 1.0f, 0.0f,
-                              0.5f, -0.5f,0.0f, 0.0f, 0.0f, 1.0f
-    };
-
-    // Set the viewport
-    glViewport ( 0, 0, width, height);
-
-    // Clear the color buffer
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    // Use the program object
-    glUseProgram(program_object_);
-
-    // disable vbo.
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-    // Load the vertex data, position
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), vVertices);
-    glEnableVertexAttribArray(0);
-
-    // Load the vertex data, color
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(vVertices + 3));
-    glEnableVertexAttribArray(1);
-
-    glDrawArrays ( GL_TRIANGLES, 0, 3 );
 }
 
 Renderer::~Renderer() {
@@ -162,8 +134,39 @@ Renderer::~Renderer() {
         display_ = EGL_NO_DISPLAY;
     }
 
-    delete triangle_render_;
-    triangle_render_ = nullptr;
+    glDeleteProgram(program_object_);
+    program_object_ = 0;
+}
+
+// No EBO, direct draw triangles.
+void DrawTriangle(GLuint program_object, GLsizei width, GLsizei height) {
+    //                        position,                      |   color
+    GLfloat vVertices[] = {   0.0f,  0.5f, 0.0f,  1.0f, 0.0f, 0.0f,
+                             -0.5f, -0.5f, 0.0f,  0.0f, 1.0f, 0.0f,
+                             0.5f, -0.5f,0.0f, 0.0f, 0.0f, 1.0f
+    };
+
+    // Set the viewport
+    glViewport ( 0, 0, width, height);
+
+    // Clear the color buffer
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    // Use the program object
+    glUseProgram(program_object);
+
+    // disable vbo.
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    // Load the vertex data, position
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), vVertices);
+    glEnableVertexAttribArray(0);
+
+    // Load the vertex data, color
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(vVertices + 3));
+    glEnableVertexAttribArray(1);
+
+    glDrawArrays ( GL_TRIANGLES, 0, 3 );
 }
 
 void Renderer::render() {
@@ -185,7 +188,7 @@ void Renderer::render() {
     // Render all the models. There's no depth testing in this sample so they're accepted in the
     // order provided. But the sample EGL setup requests a 24 bit depth buffer so you could
     // configure it at the end of initRenderer
-    triangle_render_->Draw(width_, height_);
+    DrawTriangle(program_object_, width_, height_);
 
     // Present the rendered image. This is an implicit glFlush.
     auto swapResult = eglSwapBuffers(display_, surface_);
@@ -272,8 +275,7 @@ void Renderer::initRenderer() {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    triangle_render_ = new TriangleRender();
-    triangle_render_->Init();
+    InitTriangle(&program_object_);
 }
 
 void Renderer::updateRenderArea() {

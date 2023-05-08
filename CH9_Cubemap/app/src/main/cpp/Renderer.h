@@ -7,22 +7,6 @@
 
 struct android_app;
 
-class TriangleRender {
-public:
-    TriangleRender(): program_object_(0) {}
-    virtual ~TriangleRender() {
-        glDeleteProgram(program_object_);
-        program_object_ = 0;
-    }
-
-    bool Init();
-    void Draw(GLsizei width, GLsizei height) const;
-
-private:
-    GLuint program_object_;
-};
-
-
 class Renderer {
 public:
     /*!
@@ -36,7 +20,7 @@ public:
             width_(0),
             height_(0),
             shaderNeedsNewProjectionMatrix_(true),
-            triangle_render_(nullptr) {
+            program_object_(0) {
         initRenderer();
     }
 
@@ -76,7 +60,7 @@ private:
 
     bool shaderNeedsNewProjectionMatrix_;
 
-    TriangleRender* triangle_render_;
+    GLuint program_object_;
 };
 
 #endif //ANDROIDGLINVESTIGATIONS_RENDERER_H

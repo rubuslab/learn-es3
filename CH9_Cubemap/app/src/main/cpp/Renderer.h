@@ -7,6 +7,43 @@
 
 struct android_app;
 
+class CubemapRender {
+public:
+    CubemapRender(): program_object_(0) {}
+    virtual ~CubemapRender() {
+        glDeleteProgram(program_object_);
+        program_object_ = 0;
+    }
+
+    bool Init();
+    void Draw(GLsizei width, GLsizei height) const;
+
+private:
+    ///
+    // Create a simple cubemap with a 1x1 face with a different color for each face
+    // return texture id
+    GLuint CreateSimpleTextureCubemap();
+
+    GLuint program_object_;
+    struct RenderUserData {
+        // Handle to a program object
+        GLuint programObject;
+
+        // Sampler location
+        GLint samplerLoc;
+
+        // Texture handle
+        GLuint textureId;
+
+        // Vertex data
+        int      numIndices;
+        GLfloat *vertices;
+        GLfloat *normals;
+        GLuint  *indices;
+    }UserData_;
+};
+
+
 class Renderer {
 public:
     /*!
@@ -20,7 +57,7 @@ public:
             width_(0),
             height_(0),
             shaderNeedsNewProjectionMatrix_(true),
-            program_object_(0) {
+            cubemap_render_(nullptr) {
         initRenderer();
     }
 
@@ -60,7 +97,7 @@ private:
 
     bool shaderNeedsNewProjectionMatrix_;
 
-    GLuint program_object_;
+    CubemapRender* cubemap_render_;
 };
 
 #endif //ANDROIDGLINVESTIGATIONS_RENDERER_H

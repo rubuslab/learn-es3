@@ -14,7 +14,7 @@
 #include "LearnES3Util.h"
 
 //! executes glGetString and outputs the result to logcat
-#define PRINT_GL_STRING(s) {aout << #s": "<< glGetString(s) << std::endl;}
+#define PRINT_GL_STRING(s) { aout << #s": " << glGetString(s) << std::endl; }
 
 /*!
  * @brief if glGetString returns a space separated list of elements, prints each one on a new line
@@ -38,85 +38,143 @@ aout << std::endl;\
 //! Color for cornflower blue. Can be sent directly to glClearColor
 #define CORNFLOWER_BLUE 100 / 255.f, 149 / 255.f, 237 / 255.f, 1
 
-
-///
 // Initialize the shader and program object
-//
-int InitTriangle(GLuint* program_object) {
+bool CubemapRender::Init() {
+    RenderUserData* userData = &UserData_;
     char vShaderStr[] =
-            "#version 300 es                          \n"
-            "layout(location = 0) in vec3 vPosition;  \n"
-            "layout(location = 1) in vec3 vColor;     \n"
-            "                                         \n"
-            "smooth out vec3 vertOutColor;            \n"
-            "void main()                              \n"
-            "{                                        \n"
-            "   gl_Position = vec4(vPosition, 1.0);   \n"
-            "   vertOutColor = vColor;                \n"
-            "}                                        \n";
+            "#version 300 es                            \n"
+            "layout(location = 0) in vec4 a_position;   \n"
+            "layout(location = 1) in vec3 a_normal;     \n"
+            "out vec3 v_normal;                         \n"
+            "void main()                                \n"
+            "{                                          \n"
+            "   gl_Position = a_position;               \n"
+            "   v_normal = a_normal;                    \n"
+            "}                                          \n";
 
     char fShaderStr[] =
-            "#version 300 es                              \n"
-            "precision mediump float;                     \n"
-            "smooth in vec3 vertOutColor;                 \n"
-            "out vec4 fragColor;                          \n"
-            "void main()                                  \n"
-            "{                                            \n"
-            // "   fragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );  \n"
-            "    fragColor = vec4(vertOutColor, 1.0);     \n"
-            "}                                            \n";
+            "#version 300 es                                     \n"
+            "precision mediump float;                            \n"
+            "in vec3 v_normal;                                   \n"
+            "layout(location = 0) out vec4 outColor;             \n"
+            "uniform samplerCube s_texture;                      \n"
+            "void main()                                         \n"
+            "{                                                   \n"
+            "   outColor = texture( s_texture, v_normal );       \n"
+            "}                                                   \n";
 
-    GLuint vertexShader;
-    GLuint fragmentShader;
-    GLuint programObject;
-    GLint linked;
+    // Load the shaders and get a linked program object
+    userData->programObject = esLoadProgram ( vShaderStr, fShaderStr );
 
-    // Load the vertex/fragment shaders
-    vertexShader = LoadShader(GL_VERTEX_SHADER, vShaderStr);
-    fragmentShader = LoadShader(GL_FRAGMENT_SHADER, fShaderStr);
+    // Get the sampler locations
+    userData->samplerLoc = glGetUniformLocation ( userData->programObject, "s_texture" );
 
-    // Create the program object
-    programObject = glCreateProgram ( );
-    if ( programObject == 0 ) {
-        return 0;
-    }
+    // Load the texture
+    userData->textureId = CreateSimpleTextureCubemap ();
 
-    glAttachShader(programObject, vertexShader);
-    glAttachShader(programObject, fragmentShader);
+    // Generate the vertex data
+    userData->numIndices = esGenSphere ( 20, 0.75f, &userData->vertices, &userData->normals,
+                                         NULL, &userData->indices );
 
-    // Link the program
-    glLinkProgram ( programObject );
-
-    // Check the link status
-    glGetProgramiv(programObject, GL_LINK_STATUS, &linked);
-    if (!linked) {
-        GLint infoLen = 0;
-
-        glGetProgramiv ( programObject, GL_INFO_LOG_LENGTH, &infoLen );
-
-        if ( infoLen > 1 )
-        {
-            char* infoLog = (char*)malloc ( sizeof ( char ) * infoLen );
-
-            glGetProgramInfoLog ( programObject, infoLen, NULL, infoLog );
-            esLogMessage ( "Error linking program:\n%s\n", infoLog );
-
-            free ( infoLog );
-        }
-
-        glDeleteProgram ( programObject );
-        return FALSE;
-    }
-
-    // Store the program object
-    *program_object = programObject;
-
-    // indicate auto delete shader when program been deleted.
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
 
     glClearColor ( 1.0f, 1.0f, 1.0f, 0.0f );
     return TRUE;
+};
+
+GLuint CubemapRender::CreateSimpleTextureCubemap() {
+    GLuint textureId;
+    // Six 1x1 RGB faces
+    GLubyte cubePixels[6][3] =
+            {
+                    // Face 0 - Red
+                    255, 0, 0,
+                    // Face 1 - Green,
+                    0, 255, 0,
+                    // Face 2 - Blue
+                    0, 0, 255,
+                    // Face 3 - Yellow
+                    255, 255, 0,
+                    // Face 4 - Purple
+                    255, 0, 255,
+                    // Face 5 - White
+                    255, 255, 255
+            };
+
+    // Generate a texture object
+    glGenTextures ( 1, &textureId );
+
+    // Bind the texture object
+    glBindTexture ( GL_TEXTURE_CUBE_MAP, textureId );
+
+    // Load the cube face - Positive X
+    glTexImage2D ( GL_TEXTURE_CUBE_MAP_POSITIVE_X, 0, GL_RGB, 1, 1, 0,
+                   GL_RGB, GL_UNSIGNED_BYTE, &cubePixels[0] );
+
+    // Load the cube face - Negative X
+    glTexImage2D ( GL_TEXTURE_CUBE_MAP_NEGATIVE_X, 0, GL_RGB, 1, 1, 0,
+                   GL_RGB, GL_UNSIGNED_BYTE, &cubePixels[1] );
+
+    // Load the cube face - Positive Y
+    glTexImage2D ( GL_TEXTURE_CUBE_MAP_POSITIVE_Y, 0, GL_RGB, 1, 1, 0,
+                   GL_RGB, GL_UNSIGNED_BYTE, &cubePixels[2] );
+
+    // Load the cube face - Negative Y
+    glTexImage2D ( GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, 0, GL_RGB, 1, 1, 0,
+                   GL_RGB, GL_UNSIGNED_BYTE, &cubePixels[3] );
+
+    // Load the cube face - Positive Z
+    glTexImage2D ( GL_TEXTURE_CUBE_MAP_POSITIVE_Z, 0, GL_RGB, 1, 1, 0,
+                   GL_RGB, GL_UNSIGNED_BYTE, &cubePixels[4] );
+
+    // Load the cube face - Negative Z
+    glTexImage2D ( GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, 0, GL_RGB, 1, 1, 0,
+                   GL_RGB, GL_UNSIGNED_BYTE, &cubePixels[5] );
+
+    // Set the filtering mode
+    glTexParameteri ( GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+    glTexParameteri ( GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+
+    return textureId;
+}
+
+///
+// Draw a triangle using the shader pair created in Init()
+//
+void CubemapRender::Draw (GLsizei width, GLsizei height) const {
+    const RenderUserData* userData = &UserData_;
+
+    // Set the viewport
+    glViewport ( 0, 0, width, height );
+
+    // Clear the color buffer
+    glClear ( GL_COLOR_BUFFER_BIT );
+
+
+    glCullFace ( GL_BACK );
+    glEnable ( GL_CULL_FACE );
+
+    // Use the program object
+    glUseProgram ( userData->programObject );
+
+    // Load the vertex position
+    glVertexAttribPointer ( 0, 3, GL_FLOAT,
+                            GL_FALSE, 0, userData->vertices );
+    // Load the normal
+    glVertexAttribPointer ( 1, 3, GL_FLOAT,
+                            GL_FALSE, 0, userData->normals );
+
+    glEnableVertexAttribArray ( 0 );
+    glEnableVertexAttribArray ( 1 );
+
+    // Bind the texture
+    glActiveTexture ( GL_TEXTURE0 );
+    glBindTexture ( GL_TEXTURE_CUBE_MAP, userData->textureId );
+
+    // Set the sampler texture unit to 0
+    glUniform1i ( userData->samplerLoc, 0 );
+
+    glDrawElements ( GL_TRIANGLES, userData->numIndices,
+                     GL_UNSIGNED_INT, userData->indices );
 }
 
 Renderer::~Renderer() {
@@ -134,39 +192,8 @@ Renderer::~Renderer() {
         display_ = EGL_NO_DISPLAY;
     }
 
-    glDeleteProgram(program_object_);
-    program_object_ = 0;
-}
-
-// No EBO, direct draw triangles.
-void DrawTriangle(GLuint program_object, GLsizei width, GLsizei height) {
-    //                        position,                      |   color
-    GLfloat vVertices[] = {   0.0f,  0.5f, 0.0f,  1.0f, 0.0f, 0.0f,
-                             -0.5f, -0.5f, 0.0f,  0.0f, 1.0f, 0.0f,
-                             0.5f, -0.5f,0.0f, 0.0f, 0.0f, 1.0f
-    };
-
-    // Set the viewport
-    glViewport ( 0, 0, width, height);
-
-    // Clear the color buffer
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    // Use the program object
-    glUseProgram(program_object);
-
-    // disable vbo.
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-    // Load the vertex data, position
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), vVertices);
-    glEnableVertexAttribArray(0);
-
-    // Load the vertex data, color
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(vVertices + 3));
-    glEnableVertexAttribArray(1);
-
-    glDrawArrays ( GL_TRIANGLES, 0, 3 );
+    delete cubemap_render_;
+    cubemap_render_ = nullptr;
 }
 
 void Renderer::render() {
@@ -188,7 +215,7 @@ void Renderer::render() {
     // Render all the models. There's no depth testing in this sample so they're accepted in the
     // order provided. But the sample EGL setup requests a 24 bit depth buffer so you could
     // configure it at the end of initRenderer
-    DrawTriangle(program_object_, width_, height_);
+    cubemap_render_->Draw(width_, height_);
 
     // Present the rendered image. This is an implicit glFlush.
     auto swapResult = eglSwapBuffers(display_, surface_);
@@ -275,7 +302,8 @@ void Renderer::initRenderer() {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    InitTriangle(&program_object_);
+    cubemap_render_ = new CubemapRender();
+    cubemap_render_->Init();
 }
 
 void Renderer::updateRenderArea() {

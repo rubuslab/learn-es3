@@ -38,144 +38,205 @@ aout << std::endl;\
 //! Color for cornflower blue. Can be sent directly to glClearColor
 #define CORNFLOWER_BLUE 100 / 255.f, 149 / 255.f, 237 / 255.f, 1
 
+///
+// Initialize the framebuffer object and MRTs
+//
+int MRTRender::InitFBO() {
+    RenderUserData* userData = &UserData_;
+    int i;
+    GLint defaultFramebuffer = 0;
+    const GLenum attachments[4] =
+            {
+                    GL_COLOR_ATTACHMENT0,
+                    GL_COLOR_ATTACHMENT1,
+                    GL_COLOR_ATTACHMENT2,
+                    GL_COLOR_ATTACHMENT3
+            };
+
+    glGetIntegerv ( GL_FRAMEBUFFER_BINDING, &defaultFramebuffer );
+
+    // Setup fbo
+    glGenFramebuffers ( 1, &userData->fbo );
+    glBindFramebuffer ( GL_FRAMEBUFFER, userData->fbo );
+
+    // Setup four output buffers and attach to fbo
+    userData->textureHeight = userData->textureWidth = 400;
+    glGenTextures ( 4, &userData->colorTexId[0] );
+    for (i = 0; i < 4; ++i)
+    {
+        glBindTexture ( GL_TEXTURE_2D, userData->colorTexId[i] );
+
+        glTexImage2D ( GL_TEXTURE_2D, 0, GL_RGBA,
+                       userData->textureWidth, userData->textureHeight,
+                       0, GL_RGBA, GL_UNSIGNED_BYTE, NULL );
+
+        // Set the filtering mode
+        glTexParameteri ( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+        glTexParameteri ( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+
+        glFramebufferTexture2D ( GL_DRAW_FRAMEBUFFER, attachments[i],
+                                 GL_TEXTURE_2D, userData->colorTexId[i], 0 );
+    }
+
+    glDrawBuffers ( 4, attachments );
+
+    if ( GL_FRAMEBUFFER_COMPLETE != glCheckFramebufferStatus ( GL_FRAMEBUFFER ) )
+    {
+        return FALSE;
+    }
+
+    // Restore the original framebuffer
+    glBindFramebuffer ( GL_FRAMEBUFFER, defaultFramebuffer );
+
+    return TRUE;
+}
+
 // Initialize the shader and program object
-bool CubemapRender::Init() {
+bool MRTRender::Init() {
     RenderUserData* userData = &UserData_;
     char vShaderStr[] =
             "#version 300 es                            \n"
             "layout(location = 0) in vec4 a_position;   \n"
-            "layout(location = 1) in vec3 a_normal;     \n"
-            "out vec3 v_normal;                         \n"
             "void main()                                \n"
             "{                                          \n"
             "   gl_Position = a_position;               \n"
-            "   v_normal = a_normal;                    \n"
             "}                                          \n";
 
     char fShaderStr[] =
             "#version 300 es                                     \n"
             "precision mediump float;                            \n"
-            "in vec3 v_normal;                                   \n"
-            "layout(location = 0) out vec4 outColor;             \n"
-            "uniform samplerCube s_texture;                      \n"
+            "layout(location = 0) out vec4 fragData0;            \n"
+            "layout(location = 1) out vec4 fragData1;            \n"
+            "layout(location = 2) out vec4 fragData2;            \n"
+            "layout(location = 3) out vec4 fragData3;            \n"
             "void main()                                         \n"
             "{                                                   \n"
-            "   outColor = texture( s_texture, v_normal );       \n"
+            "  // first buffer will contain red color            \n"
+            "  fragData0 = vec4 ( 1, 0, 0, 1 );                  \n"
+            "                                                    \n"
+            "  // second buffer will contain green color         \n"
+            "  fragData1 = vec4 ( 0, 1, 0, 1 );                  \n"
+            "                                                    \n"
+            "  // third buffer will contain blue color           \n"
+            "  fragData2 = vec4 ( 0, 0, 1, 1 );                  \n"
+            "                                                    \n"
+            "  // fourth buffer will contain gray color          \n"
+            "  fragData3 = vec4 ( 0.5, 0.5, 0.5, 1 );            \n"
             "}                                                   \n";
 
     // Load the shaders and get a linked program object
     userData->programObject = esLoadProgram ( vShaderStr, fShaderStr );
 
-    // Get the sampler locations
-    userData->samplerLoc = glGetUniformLocation ( userData->programObject, "s_texture" );
-
-    // Load the texture
-    userData->textureId = CreateSimpleTextureCubemap ();
-
-    // Generate the vertex data
-    userData->numIndices = esGenSphere ( 20, 0.75f, &userData->vertices, &userData->normals,
-                                         NULL, &userData->indices );
-
+    InitFBO();
 
     glClearColor ( 1.0f, 1.0f, 1.0f, 0.0f );
     return TRUE;
 };
 
-GLuint CubemapRender::CreateSimpleTextureCubemap() {
-    GLuint textureId;
-    // Six 1x1 RGB faces
-    GLubyte cubePixels[6][3] =
-            {
-                    // Face 0 - Red
-                    255, 0, 0,
-                    // Face 1 - Green,
-                    0, 255, 0,
-                    // Face 2 - Blue
-                    0, 0, 255,
-                    // Face 3 - Yellow
-                    255, 255, 0,
-                    // Face 4 - Purple
-                    255, 0, 255,
-                    // Face 5 - White
-                    255, 255, 255
-            };
-
-    // Generate a texture object
-    glGenTextures ( 1, &textureId );
-
-    // Bind the texture object
-    glBindTexture ( GL_TEXTURE_CUBE_MAP, textureId );
-
-    // Load the cube face - Positive X
-    glTexImage2D ( GL_TEXTURE_CUBE_MAP_POSITIVE_X, 0, GL_RGB, 1, 1, 0,
-                   GL_RGB, GL_UNSIGNED_BYTE, &cubePixels[0] );
-
-    // Load the cube face - Negative X
-    glTexImage2D ( GL_TEXTURE_CUBE_MAP_NEGATIVE_X, 0, GL_RGB, 1, 1, 0,
-                   GL_RGB, GL_UNSIGNED_BYTE, &cubePixels[1] );
-
-    // Load the cube face - Positive Y
-    glTexImage2D ( GL_TEXTURE_CUBE_MAP_POSITIVE_Y, 0, GL_RGB, 1, 1, 0,
-                   GL_RGB, GL_UNSIGNED_BYTE, &cubePixels[2] );
-
-    // Load the cube face - Negative Y
-    glTexImage2D ( GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, 0, GL_RGB, 1, 1, 0,
-                   GL_RGB, GL_UNSIGNED_BYTE, &cubePixels[3] );
-
-    // Load the cube face - Positive Z
-    glTexImage2D ( GL_TEXTURE_CUBE_MAP_POSITIVE_Z, 0, GL_RGB, 1, 1, 0,
-                   GL_RGB, GL_UNSIGNED_BYTE, &cubePixels[4] );
-
-    // Load the cube face - Negative Z
-    glTexImage2D ( GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, 0, GL_RGB, 1, 1, 0,
-                   GL_RGB, GL_UNSIGNED_BYTE, &cubePixels[5] );
-
-    // Set the filtering mode
-    glTexParameteri ( GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
-    glTexParameteri ( GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
-
-    return textureId;
-}
-
-///
-// Draw a triangle using the shader pair created in Init()
-//
-void CubemapRender::Draw (GLsizei width, GLsizei height) const {
-    const RenderUserData* userData = &UserData_;
+void MRTRender::DrawGeometry(GLsizei width, GLsizei height) const {
+    const RenderUserData *userData = &UserData_;
+    GLfloat vVertices[] = { -1.0f,  1.0f, 0.0f,
+                            -1.0f, -1.0f, 0.0f,
+                            1.0f, -1.0f, 0.0f,
+                            1.0f,  1.0f, 0.0f,
+    };
+    GLushort indices[] = { 0, 1, 2, 0, 2, 3 };
 
     // Set the viewport
-    glViewport ( 0, 0, width, height );
+    glViewport ( 0, 0, width, height);
 
     // Clear the color buffer
     glClear ( GL_COLOR_BUFFER_BIT );
-
-
-    glCullFace ( GL_BACK );
-    glEnable ( GL_CULL_FACE );
 
     // Use the program object
     glUseProgram ( userData->programObject );
 
     // Load the vertex position
     glVertexAttribPointer ( 0, 3, GL_FLOAT,
-                            GL_FALSE, 0, userData->vertices );
-    // Load the normal
-    glVertexAttribPointer ( 1, 3, GL_FLOAT,
-                            GL_FALSE, 0, userData->normals );
-
+                            GL_FALSE, 3 * sizeof ( GLfloat ), vVertices );
     glEnableVertexAttribArray ( 0 );
-    glEnableVertexAttribArray ( 1 );
 
-    // Bind the texture
-    glActiveTexture ( GL_TEXTURE0 );
-    glBindTexture ( GL_TEXTURE_CUBE_MAP, userData->textureId );
-
-    // Set the sampler texture unit to 0
-    glUniform1i ( userData->samplerLoc, 0 );
-
-    glDrawElements ( GL_TRIANGLES, userData->numIndices,
-                     GL_UNSIGNED_INT, userData->indices );
+    // Draw a quad
+    glDrawElements ( GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, indices );
 }
+
+void MRTRender::BlitTextures(GLsizei width, GLsizei height) const {
+    const RenderUserData* userData = &UserData_;
+
+    // set the fbo for reading
+    glBindFramebuffer ( GL_READ_FRAMEBUFFER, userData->fbo );
+
+    // Copy the output red buffer to lower left quadrant
+    glReadBuffer ( GL_COLOR_ATTACHMENT0 );
+    glBlitFramebuffer ( 0, 0, userData->textureWidth, userData->textureHeight,
+                        0, 0, width/2, height/2,
+                        GL_COLOR_BUFFER_BIT, GL_LINEAR );
+
+    // Copy the output green buffer to lower right quadrant
+    glReadBuffer ( GL_COLOR_ATTACHMENT1 );
+    glBlitFramebuffer ( 0, 0, userData->textureWidth, userData->textureHeight,
+                        width/2, 0, width, height/2,
+                        GL_COLOR_BUFFER_BIT, GL_LINEAR );
+
+    // Copy the output blue buffer to upper left quadrant
+    glReadBuffer ( GL_COLOR_ATTACHMENT2 );
+    glBlitFramebuffer ( 0, 0, userData->textureWidth, userData->textureHeight,
+                        0, height/2, width/2, height,
+                        GL_COLOR_BUFFER_BIT, GL_LINEAR );
+
+    // Copy the output gray buffer to upper right quadrant
+    glReadBuffer ( GL_COLOR_ATTACHMENT3 );
+    glBlitFramebuffer ( 0, 0, userData->textureWidth, userData->textureHeight,
+                        width/2, height/2, width, height,
+                        GL_COLOR_BUFFER_BIT, GL_LINEAR );
+}
+
+void MRTRender::ShutDown() {
+    RenderUserData* userData = &UserData_;
+
+    // Delete texture objects
+    glDeleteTextures ( 4, userData->colorTexId );
+
+    // Delete fbo
+    glDeleteFramebuffers ( 1, &userData->fbo);
+
+    // Delete program object
+    glDeleteProgram ( userData->programObject );
+}
+
+///
+// Draw a triangle using the shader pair created in Init()
+//
+void MRTRender::Draw(GLsizei width, GLsizei height) const {
+    const RenderUserData* userData = &UserData_;
+    GLint defaultFramebuffer = 0;
+    const GLenum attachments[4] =
+            {
+                    GL_COLOR_ATTACHMENT0,
+                    GL_COLOR_ATTACHMENT1,
+                    GL_COLOR_ATTACHMENT2,
+                    GL_COLOR_ATTACHMENT3
+            };
+
+    // 不论是直接渲染到屏幕还是进行离屏渲染，都需要创建震缓冲区对象即FBO，
+    // 只不过直接渲染到屏幕的FBO的GL_FRAMEBUFFER_BINDING为0。渲染到其他存储空间的frambuffer的id大于0.
+    glGetIntegerv ( GL_FRAMEBUFFER_BINDING, &defaultFramebuffer );
+
+    // FIRST: use MRTs to output four colors to four buffers
+    glBindFramebuffer ( GL_FRAMEBUFFER, userData->fbo );
+    glClear ( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+    glDrawBuffers ( 4, attachments );
+    DrawGeometry(width, height);
+
+    // SECOND: copy the four output buffers into four window quadrants
+    // with framebuffer blits
+
+    // Restore the default framebuffer, prepare to blit to default frame buffer
+    glBindFramebuffer ( GL_DRAW_FRAMEBUFFER, defaultFramebuffer );
+    BlitTextures(width, height);
+}
+
+// ====================================================================================================================
 
 Renderer::~Renderer() {
     if (display_ != EGL_NO_DISPLAY) {
@@ -302,7 +363,7 @@ void Renderer::initRenderer() {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    cubemap_render_ = new CubemapRender();
+    cubemap_render_ = new MRTRender();
     cubemap_render_->Init();
 }
 
